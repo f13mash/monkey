@@ -22,7 +22,7 @@
 #ifndef DUDA_PACKAGE_SQLITE_H
 #define DUDA_PACKAGE_SQLITE_H
 
-#include <sqlite3.h>
+#include "sqlite_main/sqlite3.h"
 
 #include "duda_api.h"
 
