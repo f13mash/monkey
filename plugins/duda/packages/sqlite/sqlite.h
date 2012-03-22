@@ -22,8 +22,18 @@
 #ifndef DUDA_PACKAGE_SQLITE_H
 #define DUDA_PACKAGE_SQLITE_H
 
-#include "sqlite_main/sqlite3.h"
 #include "duda_api.h"
+#include "mk_info.h"
+
+#ifdef PLATFORM
+    #if PLATFORM == PF_GENERIC
+        #include <sqlite3.h>
+    #elif PLATFORM == PF_ANDROID
+        #include "sqlite_main/sqlite3.h"
+    #endif
+#else
+    #include <sqlite3.h>
+#endif
 
 struct sqlite_cb_data {
     duda_request_t *dr;
