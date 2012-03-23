@@ -25,10 +25,10 @@
 #include "duda_api.h"
 #include "mk_info.h"
 
-#ifdef PLATFORM
-    #if PLATFORM == PF_GENERIC
+#ifdef MK_PLATFORM
+    #if MK_PLATFORM == MK_PLATFORM_GENERIC
         #include <sqlite3.h>
-    #elif PLATFORM == PF_ANDROID
+    #elif MK_PLATFORM == MK_PLATFORM_ANDROID
         #include "sqlite_main/sqlite3.h"
     #endif
 #else

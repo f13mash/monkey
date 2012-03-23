@@ -552,11 +552,11 @@ create_info()
 {
 
 
-local PF_GENERIC_ID=1
-local PF_ANDROID_ID=2
-local PF_ID=$PF_GENERIC_ID
+local MK_PF_GENERIC_ID=1
+local MK_PF_ANDROID_ID=2
+local MK_PF_ID=$MK_PF_GENERIC_ID
 if [ $platform == "android" ]; then
-   PF_ID=$PF_ANDROID_ID 
+   MK_PF_ID=$MK_PF_ANDROID_ID 
 fi
 
 
@@ -577,9 +577,9 @@ cat > $INCDIR/mk_info.h <<EOF
 #define MONKEY_PATH_CONF "$sysconfdir"
 
 
-#define PF_GENERIC $PF_GENERIC_ID
-#define PF_ANDROID $PF_ANDROID_ID
-#define PLATFORM   $PF_ID
+#define MK_PLATFORM_GENERIC $MK_PF_GENERIC_ID
+#define MK_PLATFORM_ANDROID $MK_PF_ANDROID_ID
+#define MK_PLATFORM   $MK_PF_ID
 
 #endif
 EOF
