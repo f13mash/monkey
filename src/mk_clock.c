@@ -31,6 +31,9 @@
 #include "mk_clock.h"
 #include "mk_utils.h"
 
+mk_pointer log_current_time = { NULL, LOG_TIME_BUFFER_SIZE - 2 };
+mk_pointer header_current_time = { NULL, HEADER_TIME_BUFFER_SIZE - 1 };
+
 static char *log_time_buffers[2];
 static char *header_time_buffers[2];
 
@@ -50,27 +53,29 @@ static inline char *_next_buffer(mk_pointer *pointer, char **buffers)
 static void mk_clock_log_set_time(time_t utime)
 {
     char *time_string;
+    struct tm result;
 
     time_string = _next_buffer(&log_current_time, log_time_buffers);
-    log_current_utime = utime;
+    __sync_bool_compare_and_swap(&log_current_utime, log_current_utime, utime);
 
     strftime(time_string, LOG_TIME_BUFFER_SIZE, "[%d/%b/%G %T %z]",
-             (struct tm *)localtime((time_t *)&utime));
+             localtime_r(&utime, &result));
 
-    log_current_time.data = time_string;
+    __sync_bool_compare_and_swap(&log_current_time.data, log_current_time.data, time_string);
 }
 
 void mk_clock_header_set_time(time_t utime)
 {
     struct tm *gmt_tm;
+    struct tm result;
     char *time_string;
 
     time_string = _next_buffer(&header_current_time, header_time_buffers);
 
-    gmt_tm = (struct tm *) gmtime(&utime);
+    gmt_tm = gmtime_r(&utime, &result);
     strftime(time_string, HEADER_TIME_BUFFER_SIZE, GMT_DATEFORMAT, gmt_tm);
 
-    header_current_time.data = time_string;
+    __sync_bool_compare_and_swap(&header_current_time.data, header_current_time.data, time_string);
 }
 
 void *mk_clock_worker_init(void *args)
@@ -85,12 +90,8 @@ void *mk_clock_worker_init(void *args)
     header_time_buffers[0] = mk_mem_malloc_z(HEADER_TIME_BUFFER_SIZE);
     header_time_buffers[1] = mk_mem_malloc_z(HEADER_TIME_BUFFER_SIZE);
 
-    header_current_time.len = HEADER_TIME_BUFFER_SIZE - 1;
-
     log_time_buffers[0] = mk_mem_malloc_z(LOG_TIME_BUFFER_SIZE);
     log_time_buffers[1] = mk_mem_malloc_z(LOG_TIME_BUFFER_SIZE);
-
-    log_current_time.len = LOG_TIME_BUFFER_SIZE - 2;
 
     while (1) {
         cur_time = time(NULL);

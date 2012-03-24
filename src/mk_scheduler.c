@@ -90,18 +90,15 @@ inline int mk_sched_add_client(int remote_fd)
     sched = &sched_list[t];
 
     MK_TRACE("[FD %i] Balance to WID %i", remote_fd, sched->idx);
-    
-    sched->active_connections += 1;
+
+    __sync_fetch_and_add(&sched->active_connections, 1);
 
     r  = mk_epoll_add(sched->epoll_fd, remote_fd, MK_EPOLL_WRITE,
                       MK_EPOLL_LEVEL_TRIGGERED);
 
-    /*
-     * Increment the active connections counter for the scheduler node in
-     * question.
-     */
+    /* If epoll has failed, decrement the active connections counter */
     if (r != 0) {
-        sched->active_connections -= 1;
+        __sync_fetch_and_sub(&sched->active_connections, 1);
     }
 
     return r;
@@ -160,7 +157,7 @@ static void *mk_sched_launch_worker_loop(void *thread_conf)
     int wid, epoll_max_events = thconf->epoll_max_events;
     struct sched_list_node *thinfo = NULL;
     mk_epoll_handlers *handler;
-    
+
     /* Avoid SIGPIPE signals */
     mk_signal_thread_sigpipe_safe();
 
@@ -213,8 +210,8 @@ int mk_sched_register_thread(int efd)
     static int wid = 0;
 
     sl = &sched_list[wid];
-    sl->active_connections = 0;
-    sl->idx = wid++;
+    __sync_bool_compare_and_swap(&sl->active_connections, sl->active_connections, 0);
+    sl->idx = __sync_fetch_and_add(&wid, 1);
     sl->tid = pthread_self();
 
     /*
@@ -229,7 +226,7 @@ int mk_sched_register_thread(int efd)
      */
     sl->pid = syscall(__NR_gettid);
 
-    sl->epoll_fd = efd;
+    __sync_bool_compare_and_swap(&sl->epoll_fd, sl->epoll_fd, efd);
     sl->queue = mk_mem_malloc_z(sizeof(struct sched_connection) *
                                 config->worker_capacity);
     sl->request_handler = NULL;
@@ -328,7 +325,7 @@ int mk_sched_remove_client(struct sched_list_node *sched, int remote_fd)
         mk_plugin_stage_run(MK_PLUGIN_STAGE_50, remote_fd, NULL, NULL, NULL);
 
         /* Change node status */
-        sched->active_connections -= 1;
+        __sync_fetch_and_sub(&sched->active_connections, 1);
         sc->status = MK_SCHEDULER_CONN_AVAILABLE;
         sc->socket = -1;
         return 0;

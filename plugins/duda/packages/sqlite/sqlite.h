@@ -42,8 +42,14 @@ struct sqlite_cb_data {
 
 struct duda_api_sqlite {
     sqlite3 *(*open) (const char *);
-    int (*dump)  (sqlite3 *, const char *, sqlite3_stmt **);
-    int (*step)  (sqlite3_stmt *);
+    int (*dump)    (sqlite3 *, const char *, sqlite3_stmt **);
+    int (*step)    (sqlite3_stmt *);
+
+    /* retrieve fields from row */
+    int (*get_int) (sqlite3_stmt *, int);
+    double (*get_double) (sqlite3_stmt *, int);
+    const unsigned char *(*get_text) (sqlite3_stmt *, int);
+
     int (*done)  (sqlite3_stmt *);
     int (*exec)  (duda_request_t *, sqlite3 *, const char *,
                   int (*) (void *, int, char **, char **), void *);
@@ -52,6 +58,7 @@ struct duda_api_sqlite {
 
 typedef struct duda_api_sqlite sqlite_object_t;
 typedef sqlite3 sqlite_db_t;
+typedef sqlite3_stmt sqlite_handle_t;
 
 sqlite_object_t *sqlite;
 
