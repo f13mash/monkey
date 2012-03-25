@@ -39,6 +39,76 @@
  * the case sensitive feature and also allow to specify a haystack len 
  * Get position of a substring.
  */
+
+static int _mk_string_search_KMP(const char *string, const char *search, int sensitive, int len)
+{
+    int size = strlen(search);
+    int pref_arr[size];
+    pref_arr[0] = 0;
+    int q = 1, l = 0, pos = 0;
+
+
+    if (sensitive == MK_STR_INSENSITIVE) {
+        while (q<size) {
+            while (l > 0 && toupper(search[q]) != toupper(search[l])) {
+                l = pref_arr[l-1];
+            }
+            if (toupper(search[q]) == toupper(search[l]))
+                l++;
+            pref_arr[q]=l;
+            q++;
+        }
+    }
+    else if (sensitive == MK_STR_SENSITIVE) {
+        while (q<size) {
+            while (l > 0 && search[q] != search[l]) {
+                l = pref_arr[l-1];
+            }
+            if (search[q] == search[l])
+                l++;
+            pref_arr[q] = l;
+            q++;
+        }
+    }
+
+    q = 0;
+
+    if (sensitive == MK_STR_INSENSITIVE) {
+        while (pos <= (len-size)) {
+            for(; q < size; q++){
+                if (toupper(string[pos+q]) != toupper(search[q])) {
+                    pos += (pref_arr[q] + 1);
+                    q = pref_arr[q];
+                    break;
+                }
+            }
+
+            if (q == size) {
+                return pos;
+            }
+        }
+    }
+    else if (sensitive == MK_STR_SENSITIVE) {
+        while (pos<=(len-size)) {
+            for (; q < size; q++) {
+                if (string[pos+q] != search[q]) {
+                    pos += (pref_arr[q]+1);
+                    q = pref_arr[q];
+                    break;
+                }
+            }
+
+            if (q == size) {
+                return pos;
+            }
+        }
+
+    }
+
+    return -1;
+}
+
+
 static int _mk_string_search(const char *string, const char *search, int sensitive, int len)
 {
     int i = 0;
@@ -110,12 +180,12 @@ int mk_string_char_search_r(const char *string, int c, int len)
 
 int mk_string_search(const char *haystack, const char *needle, int sensitive)
 {
-    return _mk_string_search(haystack, needle, sensitive, -1);
+    return _mk_string_search_KMP(haystack, needle, sensitive, -1);
 }
 
 int mk_string_search_n(const char *haystack, const char *needle, int sensitive, int len)
 {
-    return _mk_string_search(haystack, needle, sensitive, len);
+    return _mk_string_search_KMP(haystack, needle, sensitive, len);
 }
 
 char *mk_string_casestr(char *heystack, char *needle)
