@@ -37,6 +37,7 @@ struct sched_connection
 {
     int status;
     int socket;
+    int pos_in_queue;
 
     time_t arrive_time;
 };
@@ -46,6 +47,7 @@ struct sched_list_node
 {
     unsigned short int active_connections;
     struct sched_connection *queue;
+    int *free_in_queue;
 
     short int idx;
     pthread_t tid;

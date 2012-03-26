@@ -111,29 +111,39 @@ inline int mk_sched_add_client(int remote_fd)
 int mk_sched_register_client(int remote_fd, struct sched_list_node *sched)
 {
     unsigned int i, ret;
+    int pos;
 
-    for (i = 0; i < config->worker_capacity; i++) {
-        if (sched->queue[i].status == MK_SCHEDULER_CONN_AVAILABLE) {
-            MK_TRACE("[FD %i] Add in slot %i", remote_fd, i);
+    if(sched->free_in_queue[0] == 0)
+        return -1;
+    i = sched->free_in_queue[sched->free_in_queue[0]];
+    MK_TRACE("Scheduler : free => %d ,  found location : %d", sched->free_in_queue[0], i);
 
-            /* Before to continue, we need to run plugin stage 10 */
-            ret = mk_plugin_stage_run(MK_PLUGIN_STAGE_10,
-                                      remote_fd,
-                                      &sched->queue[i], NULL, NULL);
+    if (sched->queue[i].status == MK_SCHEDULER_CONN_AVAILABLE) {
+        MK_TRACE("[FD %i] Add in slot %i", remote_fd, i);
 
-            /* Close connection, otherwise continue */
-            if (ret == MK_PLUGIN_RET_CLOSE_CONX) {
-                mk_conn_close(remote_fd);
-                return MK_PLUGIN_RET_CLOSE_CONX;
-            }
+        /* Before to continue, we need to run plugin stage 10 */
+        ret = mk_plugin_stage_run(MK_PLUGIN_STAGE_10,
+                                  remote_fd,
+                                  &sched->queue[i], NULL, NULL);
 
-            /* Socket and status */
-            sched->queue[i].socket = remote_fd;
-            sched->queue[i].status = MK_SCHEDULER_CONN_PENDING;
-            sched->queue[i].arrive_time = log_current_utime;
-            return 0;
+        /* Close connection, otherwise continue */
+        if (ret == MK_PLUGIN_RET_CLOSE_CONX) {
+            mk_conn_close(remote_fd);
+            return MK_PLUGIN_RET_CLOSE_CONX;
         }
+
+        /* Socket and status */
+        sched->queue[i].socket = remote_fd;
+        sched->queue[i].status = MK_SCHEDULER_CONN_PENDING;
+        sched->queue[i].arrive_time = log_current_utime;
+        sched->free_in_queue[0] --;
+        return 0;
     }
+    else {
+        /*This should never happen*/
+        mk_err("worker : invalid free position in queue found");
+    }
+
 
     return -1;
 }
@@ -229,10 +239,14 @@ int mk_sched_register_thread(int efd)
     __sync_bool_compare_and_swap(&sl->epoll_fd, sl->epoll_fd, efd);
     sl->queue = mk_mem_malloc_z(sizeof(struct sched_connection) *
                                 config->worker_capacity);
+    sl->free_in_queue = mk_mem_malloc_z(sizeof(int) * (config->worker_capacity + 1));
+    sl->free_in_queue[0] = config->worker_capacity;
     sl->request_handler = NULL;
 
     for (i = 0; i < config->worker_capacity; i++) {
         sl->queue[i].status = MK_SCHEDULER_CONN_AVAILABLE;
+        sl->queue[i].pos_in_queue = i;
+        sl->free_in_queue[i + 1] = i;
     }
     return sl->idx;
 }
@@ -328,6 +342,8 @@ int mk_sched_remove_client(struct sched_list_node *sched, int remote_fd)
         __sync_fetch_and_sub(&sched->active_connections, 1);
         sc->status = MK_SCHEDULER_CONN_AVAILABLE;
         sc->socket = -1;
+        sched->free_in_queue[0] ++;
+        sched->free_in_queue[sched->free_in_queue[0]] = sc->pos_in_queue;
         return 0;
     }
     else {
