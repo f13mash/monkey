@@ -41,6 +41,7 @@
 #include "mk_plugin.h"
 #include "mk_utils.h"
 #include "mk_macros.h"
+#include "mk_avl.h"
 
 /*
  * Returns the worker id which should take a new incomming connection,
@@ -113,6 +114,9 @@ int mk_sched_register_client(int remote_fd, struct sched_list_node *sched)
     int ret;
     struct sched_connection *sched_conn;
     struct mk_list *av_queue = &sched->av_queue;
+    struct sched_connection *test;
+
+    ///MK_TRACE("before inserting %d", remote_fd);
 
     if (sched->active_connections < config->worker_capacity) {
         sched_conn = mk_list_entry_first(av_queue, struct sched_connection, _head);
@@ -135,6 +139,18 @@ int mk_sched_register_client(int remote_fd, struct sched_list_node *sched)
         sched_conn->socket = remote_fd;
         sched_conn->status = MK_SCHEDULER_CONN_PENDING;
         sched_conn->arrive_time = log_current_utime;
+
+        sched_conn->avl_node.l_height = 0;
+        sched_conn->avl_node.r_height = 0;
+        sched_conn->avl_node.left = NULL;
+        sched_conn->avl_node.right = NULL;
+        sched_conn->avl_node.value = remote_fd;
+
+        sched->root_avl = mk_avl_insert(sched->root_avl, &sched_conn->avl_node);
+
+        //test=mk_avl_get_val_entry(sched->root_avl, remote_fd, struct sched_connection, avl_node);
+        //MK_TRACE("inserted %d", sched->root_avl->value);
+
     }
 
 
@@ -234,6 +250,8 @@ int mk_sched_register_thread(int efd)
 
     mk_list_init(&sl->busy_queue);
     mk_list_init(&sl->av_queue);
+
+    sl->root_avl = NULL;
 
     for (i = 0; i < config->worker_capacity; i++) {
         sched_conn = mk_mem_malloc_z(sizeof(struct sched_connection));
@@ -343,6 +361,8 @@ int mk_sched_remove_client(struct sched_list_node *sched, int remote_fd)
         mk_list_del(&sc->_head);
         mk_list_add(&sc->_head, &sched->av_queue);
 
+        sched->root_avl = mk_avl_delete_val(sched->root_avl, remote_fd);
+
         return 0;
     }
     else {
@@ -354,8 +374,8 @@ int mk_sched_remove_client(struct sched_list_node *sched, int remote_fd)
 struct sched_connection *mk_sched_get_connection(struct sched_list_node *sched,
                                                  int remote_fd)
 {
-    struct mk_list *head;
-    struct sched_connection *entry;
+    struct sched_connection *entry = NULL;
+    _mk_avl_node *n;
 
     /*
      * In some cases the sched node can be NULL when is a premature close,
@@ -363,18 +383,20 @@ struct sched_connection *mk_sched_get_connection(struct sched_list_node *sched,
      * close an incoming connection when invoking the MK_PLUGIN_STAGE_10 stage plugin,
      * so no thread context exists.
      */
+
+    MK_TRACE("get connection called for", remote_fd);
     if (!sched) {
         MK_TRACE("[FD %i] No scheduler information", remote_fd);
         close(remote_fd);
         return NULL;
     }
 
-    mk_list_foreach(head, &sched->busy_queue) {
-        entry = mk_list_entry(head, struct sched_connection, _head);
-        if (entry->socket == remote_fd) {
-            return entry;
-        }
-    }
+
+    entry = mk_avl_get_val_entry(sched->root_avl, remote_fd, struct sched_connection, avl_node);
+
+    if(entry && entry->socket == remote_fd)
+        return entry;
+
 
     MK_TRACE("[FD %i] not found in scheduler list", remote_fd);
     return NULL;

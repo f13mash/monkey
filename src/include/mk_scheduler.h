@@ -25,6 +25,7 @@
 #include <arpa/inet.h>
 
 #include "mk_list.h"
+#include "mk_avl.h"
 
 #ifndef MK_SCHEDULER_H
 #define MK_SCHEDULER_H
@@ -41,6 +42,7 @@ struct sched_connection
     time_t arrive_time;
 
     struct mk_list _head;
+    _mk_avl_node avl_node;
 };
 
 /* Global struct */
@@ -50,6 +52,7 @@ struct sched_list_node
 
     struct mk_list busy_queue;
     struct mk_list av_queue;
+    _mk_avl_node *root_avl;
 
     short int idx;
     pthread_t tid;
