@@ -32,6 +32,7 @@
 #define MK_SCHEDULER_CONN_AVAILABLE -1
 #define MK_SCHEDULER_CONN_PENDING 0
 #define MK_SCHEDULER_CONN_PROCESS 1
+#define MK_SCHEDULER_MAX_SECTIONS 8
 
 struct sched_connection
 {
@@ -41,6 +42,7 @@ struct sched_connection
     time_t arrive_time;
 
     struct mk_list _head;
+    struct mk_list _sec;
 };
 
 /* Global struct */
@@ -50,6 +52,7 @@ struct sched_list_node
 
     struct mk_list busy_queue;
     struct mk_list av_queue;
+    struct mk_list conn_sec[MK_SCHEDULER_MAX_SECTIONS];
 
     short int idx;
     pthread_t tid;

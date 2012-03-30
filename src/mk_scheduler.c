@@ -113,6 +113,8 @@ int mk_sched_register_client(int remote_fd, struct sched_list_node *sched)
     int ret;
     struct sched_connection *sched_conn;
     struct mk_list *av_queue = &sched->av_queue;
+    int secid = remote_fd % MK_SCHEDULER_MAX_SECTIONS;
+
 
     if (sched->active_connections < config->worker_capacity) {
         sched_conn = mk_list_entry_first(av_queue, struct sched_connection, _head);
@@ -130,11 +132,13 @@ int mk_sched_register_client(int remote_fd, struct sched_list_node *sched)
 
         mk_list_del(&sched_conn->_head);
         mk_list_add(&sched_conn->_head, &sched->busy_queue);
+        mk_list_add(&sched_conn->_sec, &sched->conn_sec[secid]);
 
         /* Socket and status */
         sched_conn->socket = remote_fd;
         sched_conn->status = MK_SCHEDULER_CONN_PENDING;
         sched_conn->arrive_time = log_current_utime;
+
     }
 
 
@@ -234,6 +238,10 @@ int mk_sched_register_thread(int efd)
 
     mk_list_init(&sl->busy_queue);
     mk_list_init(&sl->av_queue);
+
+    for (i = 0; i < MK_SCHEDULER_MAX_SECTIONS; i++) {
+        mk_list_init(&sl->conn_sec[i]);
+    }
 
     for (i = 0; i < config->worker_capacity; i++) {
         sched_conn = mk_mem_malloc_z(sizeof(struct sched_connection));
@@ -342,6 +350,7 @@ int mk_sched_remove_client(struct sched_list_node *sched, int remote_fd)
 
         mk_list_del(&sc->_head);
         mk_list_add(&sc->_head, &sched->av_queue);
+        mk_list_del(&sc->_sec);
 
         return 0;
     }
@@ -356,6 +365,7 @@ struct sched_connection *mk_sched_get_connection(struct sched_list_node *sched,
 {
     struct mk_list *head;
     struct sched_connection *entry;
+    struct mk_list *srch = &sched->conn_sec[remote_fd % MK_SCHEDULER_MAX_SECTIONS];
 
     /*
      * In some cases the sched node can be NULL when is a premature close,
@@ -369,13 +379,12 @@ struct sched_connection *mk_sched_get_connection(struct sched_list_node *sched,
         return NULL;
     }
 
-    mk_list_foreach(head, &sched->busy_queue) {
-        entry = mk_list_entry(head, struct sched_connection, _head);
+    mk_list_foreach(head, srch) {
+        entry = mk_list_entry(head, struct sched_connection, _sec);
         if (entry->socket == remote_fd) {
             return entry;
         }
     }
-
     MK_TRACE("[FD %i] not found in scheduler list", remote_fd);
     return NULL;
 }
