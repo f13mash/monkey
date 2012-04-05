@@ -50,7 +50,6 @@ int duda_event_unregister_write(duda_request_t *dr)
         entry = mk_list_entry(head, duda_request_t, _head_events_write);
         if (entry == dr) {
             mk_list_del(&entry->_head_events_write);
-            pthread_setspecific(duda_global_events_write, list);
             return 0;
         }
     }
