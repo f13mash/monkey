@@ -114,6 +114,13 @@ main()
 	    check_pthread_lib lang
         fi
 
+        if [ $platform == "android" ]; then
+            echo -n "+ Checking for SQLite3..........."
+            check_get_sqlite
+        else
+            rm -rf $sqlite3_path
+        fi
+
         echo
         echo -e "\033[1m=== Plugins included ===\033[0m"
 
@@ -223,6 +230,42 @@ echo -en $GREEN$BOLD"Yes"$END_COLOR"\n"
 rm -fr check* configure.log a.out
 }
 
+# Get SQLite, when compiling with android
+check_get_sqlite()
+{
+local prefdir="/tmp/monkey"
+local fname="monkey.zip"
+if [ ! -d "$sqlite3_path" ]
+then
+    mkdir $sqlite3_path
+fi
+if [ ! -e "$sqlite3_path/sqlite3.h" ]
+then
+    if [ ! -d "$prefdir" ]
+    then
+        mkdir $prefdir
+        mkdir "$prefdir/sqlite3"
+    else
+        rm -rf "$prefdir/sqlite3"
+        mkdir "$prefdir/sqlite3"
+    fi
+    echo "Downloading sqlite3 from $sqlite_source"
+    get_file $sqlite_source  $prefdir/sqlite3/$fname
+    if  [ -e "$prefdir/sqlite3/$fname" ]
+    then
+        unzip -d "$prefdir/sqlite3" "$prefdir/sqlite3/$fname"
+        mv $prefdir/sqlite3/sqlite-*/* $sqlite3_path
+    else
+        echo "Download Failed . . [unable to download, alternative : extract the contents from the file at $sqlite_source to sqldir = $sqlite3_path, note all the source files must be at root of sqldir]"
+    fi
+fi
+}
+
+#Download file using wget
+# $1->file link,$2->destination-path
+get_file(){
+    wget $1 -O $2
+}
 
 # Create Makefile
 create_makefile1()
@@ -550,6 +593,12 @@ fi
 # Creando include/mk_info.h
 create_info()
 {
+local MK_PF_GENERIC_ID=1
+local MK_PF_ANDROID_ID=2
+local MK_PF_ID=$MK_PF_GENERIC_ID
+if [ $platform == "android" ]; then
+    MK_PF_ID=$MK_PF_ANDROID_ID
+fi
 cat > $INCDIR/mk_info.h <<EOF
 #ifndef MK_INFO_H
 #define MK_INFO_H
@@ -559,6 +608,9 @@ cat > $INCDIR/mk_info.h <<EOF
 #define __MONKEY__            $__MONKEY__
 #define __MONKEY_MINOR__      $__MONKEY_MINOR__
 #define __MONKEY_PATCHLEVEL__ $__MONKEY_PATCHLEVEL__
+#define MK_PLATFORM_GENERIC   $MK_PF_GENERIC_ID
+#define MK_PLATFORM_ANDROID   $MK_PF_ANDROID_ID
+#define MK_PLATFORM           $MK_PF_ID
 
 #define MONKEY_VERSION (__MONKEY__ * 10000 \\
                                 __MONKEY_MINOR__ * 100 \\
@@ -703,6 +755,9 @@ chmod 755 bin/banana
 #---------------------------#
 aux=`pwd`
 
+
+sqlite_source="http://www.sqlite.org/sqlite-amalgamation-3071100.zip"
+sqlite3_path="plugins/duda/packages/sqlite/sqlite_main"
 prefix="$aux"
 bindir="$aux/bin"
 mandir="$aux/man"
@@ -725,6 +780,9 @@ for arg in $*; do
 	esac
 
 	case "$arg" in
+        --sqlite3*)
+            sqlite_source=$optarg
+            ;;
 		--prefix*)
 			prefix=$optarg
 			bindir="$optarg/bin"
@@ -798,6 +856,7 @@ for arg in $*; do
                         echo "  --platform=PLATFORM     Target platform: 'generic' or 'android' (default: generic)"
 			echo
                         echo "Installation Directories:"
+            echo "  --sqlite3=SQLITE3_PATH  Path to Zip Archive Containing source code for SQLite into a single source file [ for more about SQlite Amalgamation refer to http://www.sqlite.org/amalgamation.html ]"
 			echo "  --prefix=PREFIX         Root prefix directory"
 			echo "  --bindir=BINDIR         Binary files (executables)"
 			echo "  --sysconfdir=SYSCONFDIR Configuration files"
@@ -805,10 +864,6 @@ for arg in $*; do
                         echo "  --mandir=MANDIR         Manpages - documentation"
 			echo "  --logdir=LOGDIR         Log files"
 			echo "  --plugdir=PLUGDIR       Plugins directory path"
-                        echo "  --enable-plugins=a,b    Enable the listed plugins"
-                        echo "  --disable-plugins=a,b   Disable the listed plugins"
-                        echo "  --safe-free             Force Monkey to free resources before exit"
-                        echo
                         echo "Override Server Configuration:"
                         echo "  --default-port=PORT     Override default TCP port (default: 2001)"
                         echo "  --default-user=USER     Override default web user (default: nobody)"
