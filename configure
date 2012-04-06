@@ -149,6 +149,10 @@ main()
 	else
 		create_makefile1_install prefix bindir mandir sysconfdir datadir logdir
 	fi
+    if [ $platform == "android" ];then
+        echo -e "+ Creating Makefile for sqlite"
+        create_sqlite_makefile
+    fi
 
         echo
         echo -e "\033[1m=== Monkey Configuration ===\033[0m"
@@ -259,6 +263,25 @@ then
         echo "Download Failed . . [unable to download, alternative : extract the contents from the file at $sqlite_source to sqldir = $sqlite3_path, note all the source files must be at root of sqldir]"
     fi
 fi
+}
+
+create_sqlite_makefile(){
+cat > $sqlite3_path/Makefile<<EOF
+CC      = $CC
+CFLAGS  = $CFLAGS
+LDFLAGS = $LDFLAGS
+DEFS    = $DEFS
+OBJECTS = sqlite3.o
+SOURCES = sqlite3.c
+
+all: \$(OBJECTS)
+
+.c.o: \$(SOURCES)
+	\$(CC) \$(CFLAGS) \$(DEFS) -fPIC -c $<
+
+clean:
+	rm -rf *~ *.o
+EOF
 }
 
 #Download file using wget

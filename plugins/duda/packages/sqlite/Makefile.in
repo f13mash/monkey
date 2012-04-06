@@ -2,7 +2,6 @@ CC      = $CC
 CFLAGS  = $CFLAGS
 LDFLAGS = $LDFLAGS
 DEFS    = $DEFS
-DIRS    = 
 INCDIR  = ../../../../src/include -I../../
 OBJECTS = duda_package.o sqlite.o
 SOURCES = duda_package.c sqlite.c
@@ -10,12 +9,12 @@ SOURCES = duda_package.c sqlite.c
 all: ../sqlite.dpkg
 
 ../sqlite.dpkg: $(OBJECTS)
-	if [ -e sqlite_main/Makefile ] ; then DIRS = $(DIRS) sqlite_main ; fi
-	@(for d in $(DIRS); do $(MAKE) -C $$d ; done)
+	if test -e sqlite_main/Makefile; then $(MAKE) -C sqlite_main ; fi
 	$(CC) $(CFLAGS) $(LDFLAGS) $(DEFS) -shared -Wl -o $@ $^ -lc
 
 .c.o: $(SOURCES)
 	$(CC) $(CFLAGS) $(DEFS) -I$(INCDIR) -fPIC -c $<
 
 clean:
+	if test -e sqlite_main/Makefile; then $(MAKE) -C sqlite_main clean ; fi
 	rm -rf *~ *.o
