@@ -19,14 +19,40 @@
  *  Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  */
 
-#ifndef DUDA_PARAM_H
-#define DUDA_PARAM_H
+#include <stdlib.h>
 
-#include "duda.h"
+#include "duda_package.h"
+#include "sha1.h"
 
-char *duda_param_get(duda_request_t *dr, short int i);
-int duda_param_get_number(duda_request_t *dr, short int idx, long *res);
-short int duda_param_count(duda_request_t *dr);
-short int duda_param_len(duda_request_t *dr, short int idx);
+static void sha1_encode (const void *dataIn, unsigned char *dataOut,  
+                         unsigned long length)
+{    
+    SHA_CTX sha;
+    SHA1_Init(&sha);
+    SHA1_Update(&sha, dataIn, length);
+    SHA1_Final(dataOut, &sha);
+}
 
-#endif
+struct duda_api_sha1 *get_sha1_api()
+{
+    struct duda_api_sha1 *sha1;
+
+    /* Alloc object */
+    sha1 = malloc(sizeof(struct duda_api_sha1));
+
+    /* Map API calls */
+    sha1->encode = sha1_encode;
+
+    return sha1;
+}
+
+duda_package_t *init_duda_package()
+{
+    duda_package_t *dpkg = malloc(sizeof(duda_package_t));
+
+    dpkg->name = "sha1";
+    dpkg->version = "0.1";
+    dpkg->api = get_sha1_api();
+
+    return dpkg;
+}

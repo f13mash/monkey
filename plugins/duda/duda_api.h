@@ -23,16 +23,17 @@
 #define DUDA_API_H
 
 #include "mk_list.h"
+#include "duda.h"
 #include "duda_global.h"
+#include "duda_cookie.h"
 #include "duda_package.h"
-
+#include "duda_console.h"
 
 /* types of data */
 typedef struct duda_interface duda_interface_t;
 typedef struct duda_method duda_method_t;
 typedef struct duda_param duda_param_t;
 typedef void * duda_callback_t;
-typedef struct duda_request duda_request_t;
 
 /* The basic web service information */
 struct duda_webservice {
@@ -59,7 +60,8 @@ struct duda_method {
 
     short int num_params;
     char *callback;
-    void *(*func_cb)(duda_request_t *);
+    void *(*cb_webservice) (duda_request_t *);
+    void *(*cb_builtin)    (duda_request_t *);
 
     struct mk_list params;
 
@@ -133,6 +135,9 @@ struct duda_api_map {
 
     /* method_ */
     duda_method_t *(*method_new) (char *, char *, int);
+    duda_method_t *(*method_builtin_new) (char *, void (*cb_builtin) (duda_request_t *),
+                                          int n_params);
+
     void (*method_add_param) (duda_param_t *, duda_method_t *);
 
     /* param_ */
@@ -163,11 +168,21 @@ struct duda_api_debug {
     void (*stacktrace) (void);
 };
 
-/* PARAMS object: params->() */
-struct duda_api_params{
-    char *(*get) (duda_request_t *, short int);
+/* PARAMS object: params->x() */
+struct duda_api_params {
+    char *(*get)       (duda_request_t *, short int);
+    int   (*get_number)(duda_request_t *, short int, long *);
     short int (*count) (duda_request_t *);
-    short int (*len) (duda_request_t *, short int);
+    short int (*len)   (duda_request_t *, short int);
+};
+
+/* SESSION object: session->x() */
+struct duda_api_session {
+    int (*init)     ();
+    int (*create)   (duda_request_t *, char *, char *, int);
+    int (*destroy)  (duda_request_t *, char *);
+    void *(*get)    (duda_request_t *, char *);
+    int (*isset)    (duda_request_t *, char *);
 };
 
 /* Global data (thread scope) */
@@ -189,8 +204,11 @@ struct duda_api_objects {
     struct duda_api_msg *msg;
     struct duda_api_response *response;
     struct duda_api_debug *debug;
+    struct duda_api_console *console;
     struct duda_api_global *global;
     struct duda_api_params *params;
+    struct duda_api_session *session;
+    struct duda_api_cookie *cookie;
 };
 
 struct duda_api_objects *duda_api_master();

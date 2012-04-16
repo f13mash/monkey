@@ -80,6 +80,21 @@ int sql_exec(duda_request_t *dr, sqlite3 *db, const char *query,
     return 0;
 }
 
+int sql_step(sqlite3_stmt *handle)
+{
+    int ret;
+
+    ret = sqlite3_step(handle);
+    if (ret == SQLITE_OK || ret == SQLITE_DONE) {
+        return 0;
+    }
+    else if (ret == SQLITE_ROW) {
+        return SQLITE_ROW;
+    }
+
+    return -1;
+}
+
 int sql_close(sqlite3 *db)
 {
     return sqlite3_close(db);

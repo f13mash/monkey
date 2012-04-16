@@ -19,14 +19,20 @@
  *  Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  */
 
-#ifndef DUDA_PARAM_H
-#define DUDA_PARAM_H
+#ifndef DUDA_CONSOLE_H
+#define DUDA_CONSOLE_H
 
 #include "duda.h"
+#include "duda_api.h"
 
-char *duda_param_get(duda_request_t *dr, short int i);
-int duda_param_get_number(duda_request_t *dr, short int idx, long *res);
-short int duda_param_count(duda_request_t *dr);
-short int duda_param_len(duda_request_t *dr, short int idx);
+#define debug(dr, fmt, ...) _debug(dr, __FILE__, __LINE__, fmt, ##__VA_ARGS__)
+#define console_debug(dr, fmt, ...) duda_console_write(dr, __FILE__, __LINE__, fmt, ##__VA_ARGS__)
+
+struct duda_api_console {
+    void (*_debug) (duda_request_t *, char *, int, char *, ...);
+};
+
+void duda_console_cb_debug(duda_request_t *dr);
+void duda_console_write(duda_request_t *dr, char *file, int line, char *format, ...);
 
 #endif

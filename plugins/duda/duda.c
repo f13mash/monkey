@@ -26,6 +26,7 @@
 #include "duda_conf.h"
 #include "duda_event.h"
 #include "duda_queue.h"
+#include "duda_console.h"
 
 MONKEY_PLUGIN("duda",                                     /* shortname */
               "Duda Web Services Framework",              /* name */
@@ -65,8 +66,8 @@ int duda_service_register(struct duda_api_objects *api, struct web_service *ws)
 {
     int (*service_init) (struct duda_api_objects *);
     struct mk_list *head_iface, *head_method;
-    struct duda_interface *entry_iface;
-    struct duda_method *entry_method;
+    struct duda_interface *entry_iface, *cs_iface;
+    struct duda_method *entry_method, *cs_method;
 
     /* Load and invoke duda_init() */
     service_init = (int (*)()) duda_load_symbol(ws->handler, "duda_init");
@@ -75,17 +76,25 @@ int duda_service_register(struct duda_api_objects *api, struct web_service *ws)
         ws->map = (struct mk_list *) duda_load_symbol(ws->handler, "_duda_interfaces");
         ws->global = duda_load_symbol(ws->handler, "_duda_global_dist");
 
+        /* Register Duda built-in interfaces: console */
+        cs_iface  = api->map->interface_new("console");
+        cs_method = api->map->method_builtin_new("debug", duda_console_cb_debug, 0);
+        api->map->interface_add_method(cs_method, cs_iface);
+        mk_list_add(&cs_iface->_head, ws->map);
+
         /* Lookup callback functions for each registered method */
         mk_list_foreach(head_iface, ws->map) {
             entry_iface = mk_list_entry(head_iface, struct duda_interface, _head);
             mk_list_foreach(head_method, &entry_iface->methods) {
                 entry_method = mk_list_entry(head_method, struct duda_method, _head);
-                entry_method->func_cb = duda_load_symbol(ws->handler, entry_method->callback);
-                if (!entry_method->func_cb) {
-                    mk_err("%s / callback not found '%s'", entry_method->uid, entry_method);
-                    exit(EXIT_FAILURE);
+                if (entry_method->callback) {
+                    entry_method->cb_webservice = duda_load_symbol(ws->handler,
+                                                                   entry_method->callback);
+                    if (!entry_method->cb_webservice) {
+                        mk_err("%s / callback not found '%s'", entry_method->uid, entry_method);
+                        exit(EXIT_FAILURE);
+                    }
                 }
-
             }
         }
     }
@@ -143,6 +152,22 @@ int duda_load_services()
     return 0;
 }
 
+void duda_mem_init()
+{
+    int len;
+
+    /* Init mk_pointer's */
+    mk_api->pointer_set(&mk_cookie_crlf, COOKIE_CRLF);
+    mk_api->pointer_set(&mk_cookie_equal, COOKIE_EQUAL);
+    mk_api->pointer_set(&mk_cookie_set, COOKIE_SET);
+    mk_api->pointer_set(&mk_cookie_expire, COOKIE_EXPIRE);
+
+    /* Default expire value */
+    mk_cookie_expire_value.data = mk_api->mem_alloc_z(COOKIE_MAX_DATE_LEN);
+    len = mk_api->time_to_gmt(&mk_cookie_expire_value.data, COOKIE_EXPIRE_TIME);
+    mk_cookie_expire_value.len = len;
+}
+
 int _mkp_event_write(int sockfd)
 {
     return duda_event_write_callback(sockfd);
@@ -161,6 +186,9 @@ void _mkp_core_thctx()
     struct web_service *entry_ws;
     duda_global_t *entry_gl;
     void *data;
+
+    /* Initialize some pointers */
+    duda_mem_init();
 
     list_events_write = mk_api->mem_alloc(sizeof(struct mk_list));
     mk_list_init(list_events_write);
@@ -203,19 +231,18 @@ int _mkp_init(void **api, char *confdir)
 
     /* Global data / Thread scope */
     pthread_key_create(&duda_global_events_write, NULL);
-
     return 0;
 }
 
 /* Sets the duda_method structure variable in duda_request */
-int duda_request_set_method(struct duda_request *dr)
+int duda_request_set_method(duda_request_t *dr)
 {
     struct mk_list *head_iface, *head_method;
     struct duda_interface *entry_iface;
     struct duda_method *entry_method;
 
     /* Finds the corresponding duda_method structure */
-    mk_list_foreach(head_iface, dr->web_service->map) {
+    mk_list_foreach(head_iface, dr->ws_root->map) {
         entry_iface = mk_list_entry(head_iface, struct duda_interface, _head);
 
         if (entry_iface->uid_len == dr->interface.len &&
@@ -241,7 +268,7 @@ int duda_request_set_method(struct duda_request *dr)
     }
 
     PLUGIN_TRACE("Method %s invoked", entry_method->uid);
-    return 0;    
+    return 0;
 }
 
 
@@ -292,13 +319,14 @@ int duda_request_parse(struct session_request *sr,
             dr->method.len     = val_len;
             last_field = MAP_WS_PARAM;
             if(duda_request_set_method(dr) == -1) {
+                console_debug(dr, "Error: unknown method");
                 return -1;
             }
             allowed_params = dr->_method->num_params;
             break;
         case MAP_WS_PARAM:
             if (dr->n_params >= MAP_WS_MAX_PARAMS || dr->n_params >= allowed_params) {
-                PLUGIN_TRACE("too much parameters (max=%i)", 
+                PLUGIN_TRACE("too much parameters (max=%i)",
                              (dr->n_params >= MAP_WS_MAX_PARAMS)?
                              MAP_WS_MAX_PARAMS:allowed_params);
                 return -1;
@@ -307,8 +335,9 @@ int duda_request_parse(struct session_request *sr,
                 head_param = (&dr->_method->params)->next;
             }
             entry_param = mk_list_entry(head_param, struct duda_param, _head);
-            if (val_len > entry_param->max_len) {
+            if (val_len > entry_param->max_len && entry_param->max_len != 0) {
                 PLUGIN_TRACE("too long param (max=%i)", entry_param->max_len);
+                console_debug(dr, "Error: param %i is too long", dr->n_params);
                 return -1;
             }
             dr->params[dr->n_params].data = sr->uri_processed.data + i;
@@ -323,11 +352,13 @@ int duda_request_parse(struct session_request *sr,
     }
 
     if (last_field < MAP_WS_METHOD) {
+        console_debug(dr, "invalid method");
         return -1;
     }
-    
+
     if ((dr->n_params) != allowed_params) {
         PLUGIN_TRACE("%i parameters required", allowed_params);
+        console_debug(dr, "Error: unexpected number of parameters");
         return -1;
     }
 
@@ -358,16 +389,15 @@ int duda_service_run(struct client_session *cs,
                      struct web_service *web_service)
 {
     struct duda_request *dr;
-    void *(*callback) (duda_request_t *) = NULL;
 
-    dr = mk_api->mem_alloc(sizeof(struct duda_request));
+    dr = mk_api->mem_alloc(sizeof(duda_request_t));
     if (!dr) {
         PLUGIN_TRACE("could not allocate enough memory");
         return -1;
     }
 
     /* service details */
-    dr->web_service = web_service;
+    dr->ws_root = web_service;
     dr->n_params = 0;
     dr->cs = cs;
     dr->sr = sr;
@@ -391,15 +421,18 @@ int duda_service_run(struct client_session *cs,
         return -1;
     }
 
-    callback = dr->_method->func_cb;
-
-    if (!callback) {
-        PLUGIN_TRACE("callback not found");
+    if (!dr->_method) {
+        PLUGIN_TRACE("method not found");
         return -1;
     }
 
-    PLUGIN_TRACE("CB %s()", dr->_method->callback);
-    dr->_method->func_cb(dr);
+    if (dr->_method->cb_webservice) {
+        PLUGIN_TRACE("CB %s()", dr->_method->callback);
+        dr->_method->cb_webservice(dr);
+    }
+    else if (dr->_method->cb_builtin) {
+        dr->_method->cb_builtin(dr);
+    }
 
     return 0;
 }

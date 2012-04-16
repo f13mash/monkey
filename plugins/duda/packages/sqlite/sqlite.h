@@ -52,7 +52,7 @@ struct duda_api_sqlite {
 
     int (*done)  (sqlite3_stmt *);
     int (*exec)  (duda_request_t *, sqlite3 *, const char *,
-                  int (*) (void *, int, char **, char **), void *);
+                  int (*) (struct sqlite_cb_data *, int, char **, char **), void *);
     int (*close) (sqlite3 *);
 };
 
@@ -68,7 +68,7 @@ sqlite3 *sql_open(const char *path);
 int sql_dump(sqlite3 *db, const char *query, sqlite3_stmt **handle);
 int sql_exec(duda_request_t *dr, sqlite3 *db, const char *query,
              int (*callback) (void *, int, char **, char **), void *data);
-
+int sql_step(sqlite3_stmt *handle);
 int sql_close(sqlite3 *db);
 
 #define SQLITE_FOREACH(handle) while (sqlite->step(handle) == SQLITE_ROW)

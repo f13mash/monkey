@@ -42,7 +42,10 @@ struct duda_api_map *map;
 struct duda_api_msg *msg;
 struct duda_api_response *response;
 struct duda_api_debug *debug;
+struct duda_api_console *console;
 struct duda_api_params *params;
+struct duda_api_session *session;
+struct duda_api_cookie *cookie;
 struct duda_api_global *global;
 duda_package_t *pkg_temp;
 
@@ -59,7 +62,10 @@ duda_package_t *pkg_temp;
     msg      = api->msg;                                                \
     response = api->response;                                           \
     debug    = api->debug;                                              \
+    console  = api->console;                                            \
     params   = api->params;                                             \
+    session  = api->session;                                            \
+    cookie   = api->cookie;                                             \
     global   = api->global;                                             \
     mk_list_init(&_duda_interfaces);                                    \
     mk_list_init(&_duda_global_dist);
@@ -88,9 +94,24 @@ duda_package_t *pkg_temp;
 
 #define duda_map_add_interface(iface) mk_list_add(&iface->_head,  _duda_interfaces)
 
+/* Invalid object messages */
+#undef mk_info
+#undef mk_warn
+#undef mk_err
+#undef mk_bug
+#define _invalid_call     " is invalid, use msg->x() object instead"
+#define mk_info(a, ...)   msg->err("mk_info()" _invalid_call)
+#define mk_warn(a, ...)   msg->err("mk_warn()" _invalid_call)
+#define mk_err(a, ...)    msg->err("mk_err()" _invalid_call)
+#define mk_bug(a, ...)    msg->err("mk_bug()" _invalid_call)
+
+
 /* API functions */
 duda_interface_t *duda_interface_new(char *uid);
 duda_method_t *duda_method_new(char *uid, char *callback, int n_params);
+duda_method_t *duda_method_builtin_new(char *uid,
+                                       void (*cb_builtin) (duda_request_t *),
+                                       int n_params);
 duda_param_t *duda_param_new(char *uid, short int max_len);
 
 void duda_interface_add_method(duda_method_t *method, duda_interface_t *iface);

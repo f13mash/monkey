@@ -22,15 +22,19 @@
 #include "MKPlugin.h"
 #include "webservice.h"
 #include "duda_debug.h"
+#include "duda_console.h"
 #include "duda.h"
 #include "duda_api.h"
 #include "duda_param.h"
+#include "duda_session.h"
+#include "duda_cookie.h"
 #include "duda_package.h"
 #include "duda_event.h"
 #include "duda_queue.h"
 #include "duda_global.h"
 #include "duda_sendfile.h"
 #include "duda_body_buffer.h"
+#include "webservice.h"
 
 /* Send HTTP response headers just once */
 int __http_send_headers_safe(duda_request_t *dr)
@@ -152,8 +156,11 @@ struct duda_api_objects *duda_api_master()
     objs->msg      = mk_api->mem_alloc(sizeof(struct duda_api_msg));
     objs->response = mk_api->mem_alloc(sizeof(struct duda_api_response));
     objs->debug    = mk_api->mem_alloc(sizeof(struct duda_api_debug));
+    objs->console  = mk_api->mem_alloc(sizeof(struct duda_api_console));
     objs->global   = mk_api->mem_alloc(sizeof(struct duda_api_global));
     objs->params   = mk_api->mem_alloc(sizeof(struct duda_api_params));
+    objs->session  = mk_api->mem_alloc(sizeof(struct duda_api_session));
+    objs->cookie   = mk_api->mem_alloc(sizeof(struct duda_api_cookie));
 
     /* MAP Duda calls */
     objs->duda->package_load = duda_package_load;
@@ -162,6 +169,8 @@ struct duda_api_objects *duda_api_master()
     objs->map->interface_new = duda_interface_new;
     objs->map->interface_add_method = duda_interface_add_method;
     objs->map->method_new = duda_method_new;
+    objs->map->method_builtin_new = duda_method_builtin_new;
+
     objs->map->method_add_param = duda_method_add_param;
     objs->map->param_new = duda_param_new;
 
@@ -178,12 +187,27 @@ struct duda_api_objects *duda_api_master()
     objs->response->sendfile    = _sendfile_enqueue;
     objs->response->end = _end_response;
 
-    /* DEBUG object */
+    /* CONSOLE object */
+    objs->console->_debug = duda_console_write;
 
     /* PARAMS object */
-    objs->params->count = duda_param_count;
-    objs->params->get   = duda_param_get;
-    objs->params->len   = duda_param_len;
+    objs->params->count      = duda_param_count;
+    objs->params->get        = duda_param_get;
+    objs->params->get_number = duda_param_get_number;
+    objs->params->len        = duda_param_len;
+
+    /* SESSION object */
+    objs->session->init    = duda_session_init;
+    objs->session->create  = duda_session_create;
+    objs->session->destroy = duda_session_destroy;
+    objs->session->get     = duda_session_get;
+    objs->session->isset   = duda_session_isset;
+
+    /* COOKIE object */
+    objs->cookie->set     = duda_cookie_set;
+    objs->cookie->get     = duda_cookie_get;
+    objs->cookie->cmp     = duda_cookie_cmp;
+    objs->cookie->destroy = duda_cookie_destroy;
 
     /* Global data (thread scope) */
     objs->global->set  = duda_global_set;

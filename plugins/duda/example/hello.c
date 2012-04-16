@@ -2,6 +2,7 @@
 
 #include "webservice.h"
 #include "packages/json/json.h"
+#include "packages/sha1/sha1.h"
 
 #define INCORRECT_PARAMETERS "Incorrect Parameters\n"
 #define FORMATTED_OUT "==Formatted JSON output==\n"
@@ -35,6 +36,8 @@ duda_global_t my_data_empty;
  * |                                   format        11           |
  * |                          (formatted/unformatted)             |
  * +--------------------------------------------------------------+
+ * |                   sha1_test                     0            |
+ * +--------------------------------------------------------------+
  *
  */
 
@@ -63,6 +66,20 @@ void cb_sendfile(duda_request_t *dr)
     response->sendfile(dr, "/etc/motd");
     response->end(dr, cb_end);
 
+}
+
+void cb_sha1_test(duda_request_t *dr)
+{
+    char toEncode[] = "hello world!";
+    unsigned int length = strlen(toEncode);
+    unsigned char encoded[SHA_DIGEST_LENGTH];
+    sha1->encode(toEncode, encoded, length);
+
+    response->http_status(dr, 200);
+    response->http_header(dr, "Content-Type: text/html;charset=UTF-8", 37);
+    response->body_write(dr, "Raw: hello world!<br>Encoded: ", 30);
+    response->body_write(dr, (char *)encoded, SHA_DIGEST_LENGTH);
+    response->end(dr, cb_end);
 }
 
 void cb_json_first(duda_request_t *dr)
@@ -158,7 +175,7 @@ void cb_json_second(duda_request_t *dr){
     pvalue1 = params->get(dr, pnumber);
     pnumber = 1;
     pvalue2 = params->get(dr, pnumber);
-    
+
     if(!pvalue1 || !pvalue2) {
         response->body_write(dr, INCORRECT_PARAMETERS, sizeof(INCORRECT_PARAMETERS) - 1);
     }else if(strncmp(pvalue1, CREATE, sizeof(CREATE) - 1) == 0 && (sizeof(CREATE) - 1) == strlen(pvalue1)) {
@@ -221,9 +238,10 @@ int duda_init(struct duda_api_objects *api)
     duda_interface_t *if_system;
     duda_method_t    *method;
     duda_param_t *param;
-    
+
     duda_service_init();
     duda_load_package(json, "json");
+    duda_load_package(sha1, "sha1");
 
     /* An empty global variable */
     duda_global_init(my_data_empty, NULL);
@@ -238,6 +256,10 @@ int duda_init(struct duda_api_objects *api)
     method = map->method_new("hello_world", "cb_hello_world", 0);
     map->interface_add_method(method, if_system);
 
+    /* URI: /hello/examples/sha1_test */
+    method = map->method_new("sha1_test", "cb_sha1_test", 0);
+    map->interface_add_method(method, if_system);
+
     /* URI: /hello/examples/json_first */
     method = map->method_new("json_first", "cb_json_first", 0);
     map->interface_add_method(method, if_system);
@@ -249,7 +271,7 @@ int duda_init(struct duda_api_objects *api)
     method = map->method_new("json_second", "cb_json_second", 2);
     param = map->param_new("action", strlen("create"));
     map->method_add_param(param, method);
-    param = map->param_new("format", strlen("unformatted")); 
+    param = map->param_new("format", strlen("unformatted"));
     map->method_add_param(param, method);
     map->interface_add_method(method, if_system);
 
@@ -262,6 +284,6 @@ int duda_init(struct duda_api_objects *api)
 
     if_system = map->interface_new("test");
     duda_service_add_interface(if_system);
-    
+
     duda_service_ready();
 }

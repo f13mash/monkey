@@ -16,17 +16,12 @@
  *
  *  You should have received a copy of the GNU General Public License
  *  along with this program; if not, write to the Free Software
- *  Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
+ *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  */
 
-#ifndef DUDA_PARAM_H
-#define DUDA_PARAM_H
+#ifndef MK_WEBSOCKET_ECHO_H
+#define MK_WEBSOCKET_ECHO_H
 
-#include "duda.h"
-
-char *duda_param_get(duda_request_t *dr, short int i);
-int duda_param_get_number(duda_request_t *dr, short int idx, long *res);
-short int duda_param_count(duda_request_t *dr);
-short int duda_param_len(duda_request_t *dr, short int idx);
+int ws_echo_write_callback(int, unsigned char *, uint64_t);
 
 #endif

@@ -1,3 +1,4 @@
+
 /* -*- Mode: C; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4 -*- */
 
 /*  Monkey HTTP Daemon
@@ -16,17 +17,24 @@
  *
  *  You should have received a copy of the GNU General Public License
  *  along with this program; if not, write to the Free Software
- *  Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
+ *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  */
 
-#ifndef DUDA_PARAM_H
-#define DUDA_PARAM_H
+#include <stdint.h>
+#include <stdlib.h>
+#include "echo.h"
+#include "ws.h"
 
-#include "duda.h"
+int ws_echo_write_callback(int sockfd, unsigned char *payload_data, uint64_t payload_len)
+{
+    int n;
 
-char *duda_param_get(duda_request_t *dr, short int i);
-int duda_param_get_number(duda_request_t *dr, short int idx, long *res);
-short int duda_param_count(duda_request_t *dr);
-short int duda_param_len(duda_request_t *dr, short int idx);
+    /* Just send it out */
+    n = ws_send_data(sockfd, 1, 0, 0, 0, WS_FRAME_TEXT, 
+        0, payload_len, NULL, payload_data);
+    if (n < 0) {
+        return -1;
+    }
 
-#endif
+    return 0;
+}

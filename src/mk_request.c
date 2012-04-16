@@ -21,6 +21,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <limits.h>
 #include <sys/stat.h>
 #include <unistd.h>
 #include <string.h>
@@ -238,7 +239,7 @@ static int mk_request_header_process(struct session_request *sr)
                                  mk_rh_host.len);
 
     if (host.data) {
-        if ((pos_sep = mk_string_char_search(host.data, ':', host.len)) >= 0) {
+        if ((pos_sep = mk_string_char_search_r(host.data, ':', host.len)) >= 0) {
             /* TCP port should not be higher than 65535 */
             char _port[6];
 
@@ -251,6 +252,11 @@ static int mk_request_header_process(struct session_request *sr)
 
             memcpy(_port, host.data + pos_sep + 1, host.len - pos_sep);
             sr->port = strtol(_port, (char **) NULL, 10);
+            if ((errno == ERANGE && (sr->port == LONG_MAX || sr->port == LONG_MIN))
+                || sr->port == 0) {
+                return -1;
+            }
+
         }
         else {
             sr->host = host;    /* maybe null */
@@ -447,6 +453,10 @@ static int mk_request_process(struct client_session *cs, struct session_request 
     struct mk_list *hosts = &config->hosts;
     struct mk_list *alias;
 
+    /* Always assign the first node 'default vhost' */
+    sr->host_conf = mk_list_entry_first(hosts, struct host, _head);
+
+    /* Parse request */
     status = mk_request_header_process(sr);
     if (status < 0) {
         mk_header_set_http_status(sr, MK_CLIENT_BAD_REQUEST);
@@ -474,8 +484,7 @@ static int mk_request_process(struct client_session *cs, struct session_request 
         return EXIT_ABORT;
     }
 
-    /* Always assign the first node 'default vhost' */
-    sr->host_conf = mk_list_entry_first(hosts, struct host, _head);
+    /* Assign the first node alias */
     alias = &sr->host_conf->server_names;
     sr->host_alias = mk_list_entry_first(alias,
                                          struct host_alias, _head);

@@ -19,14 +19,22 @@
  *  Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  */
 
-#ifndef DUDA_PARAM_H
-#define DUDA_PARAM_H
+#ifndef DUDA_SESSION_H
+#define DUDA_SESSION_H
 
 #include "duda.h"
 
-char *duda_param_get(duda_request_t *dr, short int i);
-int duda_param_get_number(duda_request_t *dr, short int idx, long *res);
-short int duda_param_count(duda_request_t *dr);
-short int duda_param_len(duda_request_t *dr, short int idx);
+#define SESSION_STORE_PATH     "/dev/shm/duda_sessions"
+#define SESSION_DEFAULT_PERM   0700
+#define SESSION_UUID_SIZE      128  /* 128 bytes */
+#define SESSION_KEY            "DUDA_SESSION"
+
+struct mk_list session_list;
+
+int duda_session_init();
+int duda_session_create(duda_request_t *dr, char *name, char *value, int expires);
+int duda_session_destroy(duda_request_t *dr, char *uuid);
+void *duda_session_get(duda_request_t *dr, char *name);
+int duda_session_isset(duda_request_t *dr, char *name);
 
 #endif

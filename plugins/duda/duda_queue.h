@@ -22,6 +22,8 @@
 #ifndef DUDA_QUEUE_H
 #define DUDA_QUEUE_H
 
+#include "duda.h"
+
 #define DUDA_QTYPE_ERROR        -1
 #define DUDA_QTYPE_BODY_BUFFER   1
 #define DUDA_QTYPE_SENDFILE      2

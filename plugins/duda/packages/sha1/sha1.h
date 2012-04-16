@@ -19,14 +19,32 @@
  *  Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  */
 
-#ifndef DUDA_PARAM_H
-#define DUDA_PARAM_H
+#ifndef DUDA_PACKAGE_SHA1_H
+#define DUDA_PACKAGE_SHA1_H
+#include <stddef.h>
 
-#include "duda.h"
+#define SHA_DIGEST_LENGTH 20
 
-char *duda_param_get(duda_request_t *dr, short int i);
-int duda_param_get_number(duda_request_t *dr, short int idx, long *res);
-short int duda_param_count(duda_request_t *dr);
-short int duda_param_len(duda_request_t *dr, short int idx);
+struct duda_api_sha1 {
+    void (*encode) (const void *, unsigned char *, unsigned long);
+};
 
-#endif
+typedef struct duda_api_sha1 sha1_object_t;
+sha1_object_t *sha1;
+
+typedef struct {
+	unsigned long long size;
+	unsigned int H[5];
+	unsigned int W[16];
+} blk_SHA_CTX;
+
+void blk_SHA1_Init(blk_SHA_CTX *ctx);
+void blk_SHA1_Update(blk_SHA_CTX *ctx, const void *dataIn, unsigned long len);
+void blk_SHA1_Final(unsigned char hashout[20], blk_SHA_CTX *ctx);
+
+#define SHA_CTX	    blk_SHA_CTX
+#define SHA1_Init	blk_SHA1_Init
+#define SHA1_Update	blk_SHA1_Update
+#define SHA1_Final	blk_SHA1_Final
+
+#endif // DUDA_PACKAGE_SHA1_H
